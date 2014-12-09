@@ -1,0 +1,474 @@
+
+```{r number_figures, echo=FALSE, message=FALSE, warning=FALSE}
+# This is a knitr hook to enable figure and table captions
+# number figures
+# from http://stackoverflow.com/a/18672268/1036500
+library("knitr")
+tn = local({
+  i = 0
+  function(x) {
+    i <<- i + 1
+    paste("<table><caption>", 'Figure ', i, ': ', x, "</caption><colgroup><col width='100'></col></colgroup><thead><tr class='header'></tr></thead><tbody></tbody></table><p>", sep = '')
+  }
+})
+knit_hooks$set(fig.cap = function(before, options, envir) {
+  if(!before)
+    tn(options$fig.cap)
+})
+default_output_hook = knit_hooks$get("output")
+knit_hooks$set(output = function(x, options) {
+  if (is.null(options$fig.cap) == F)  
+    x
+  else
+    default_output_hook(x,options)
+})
+ 
+# number tables
+# from http://stackoverflow.com/a/18672268/1036500
+to = local({
+  i = 0
+  function(x) {
+    i <<- i + 1
+    paste("<table><caption>", 'Table ', i, ': ', x, "</caption><colgroup><col width='100'></col></colgroup><thead><tr class='header'></tr></thead><tbody></tbody></table><p>", sep = '')
+  }
+})
+knit_hooks$set(tab.cap = function(before, options, envir) {
+  if(!before)
+    to(options$tab.cap)
+})
+default_output_hook = knit_hooks$get("output")
+knit_hooks$set(output = function(x, options) {
+  if (is.null(options$tab.cap) == F)  
+    x
+  else
+    default_output_hook(x,options)
+})
+```
+  
+```{r setup, echo=FALSE, message=FALSE, warning=FALSE}
+require(knitr)
+library(plyr)
+library(dplyr)
+library(rvest)
+library(ggplot2)
+library(scales)
+library(reshape2)
+library(tm)
+library(quanteda)
+library(JSTORr)
+library(gridExtra)
+library(kfigr) # devtools::install_github("mkoohafkan/kfigr")
+opts_chunk$set(message=FALSE, warning=FALSE, echo=FALSE, cache=TRUE)
+```
+ 
+
+## Video Blogging in Archaeology: A review of Tong et al.'s Project Eliseg videos
+
+In this review I evaluate the how Tong et al. used video of archaeological fieldwork as a method for members of Project Eliseg to communicate with the public. This review has three parts. First, I survey uses of video in archaeology, as identified using text mining methods, to give context to the Tong et al. study. Second, I describe the aims, the structure and content of the videos in the Project Eliseg. Third, I analyse the strengths and weaknesses of their method using a model of public engagement.
+
+### Uses of video in archaeology
+```{r doa}
+################ Day of Archaeology blog####################
+# work with previously scraped data...
+DOA <- "vlog_review_data/DOA_posts/dayofarchaeology.csv"
+DOA <- read.csv(DOA)
+
+DOA_corpus <- Corpus(VectorSource(DOA$text))
+DOA_tdm <- TermDocumentMatrix(DOA_corpus, 
+                          control = list(removePunctuation = TRUE, 
+                                         stopwords = TRUE,
+                                         removePunctuation = TRUE,
+                                         removeNumbers = TRUE,
+                                         removeNumbers = TRUE,
+                                         stripWhitespace = TRUE,
+                                         tolower = TRUE))
+
+# how many blog posts?
+DOA_doc_count <- ncol(DOA_tdm)
+
+# how many words? Make it pretty!
+# https://stat.ethz.ch/pipermail/r-help/2011-May/277544.html
+DOA_word_count <- sum(colSums(as.matrix(DOA_tdm)))
+DOA_word_count_pretty <- formatC(DOA_word_count, 
+                          big.mark=",",format="f", 
+                          drop0trailing = TRUE)
+
+# overall frequency of words in this dataset
+DOA_video_freq <- sum(colSums(as.matrix(DOA_tdm[DOA_tdm$dimnames$Terms == "video",])))
+DOA_video_freq_per_thou <- DOA_video_freq / DOA_word_count * 1000
+
+# association of video and other relevant words
+# get all words associated...
+DOA_associated_words <- findAssocs(DOA_tdm, "video", 0.01)
+# make data frame
+DOA_associated_words <- data.frame(word = dimnames(DOA_associated_words)[[1]],
+                                   corr = unname(DOA_associated_words)) 
+
+# find top correlated words
+DOA_top_corr <- DOA_associated_words %>%
+   arrange(desc(corr)) %>%
+   head(n = 50L)
+
+# subset to find corrs with words of interest         
+toMatch <- c("fieldwork", "excavat", "outreach", "public", "interpret", "labor", "documentar", "televis", "film")
+DOA_associated_words_df <- DOA_associated_words %>%
+  filter(grepl(paste(toMatch,collapse="|"), word)) %>%
+  arrange(desc(corr))
+
+# keyword in context
+library(quanteda)
+DOA_kwic_corpus <- corpus(as.character(DOA$text))
+DOA_mykwic_video <- kwic(DOA_kwic_corpus, "video", 6)
+DOA_mykwic_blog <- kwic(DOA_kwic_corpus, "blog", 6)
+```
+
+```{r saa}
+##################### SAA abstracts ########################
+
+# convert PDF files of SAA abstracts to text
+# from http://stackoverflow.com/a/21449040/1036500
+
+# set directory with PDFs
+dest <- "vlog_review_data/SAA_abstracts"
+
+# make a vector of PDF file names
+SAA_files <- list.files(path = dest, pattern = "pdf",  full.names = TRUE)
+
+# convert each PDF file that is named in the vector into a text file 
+# text file is created in the same directory as the PDFs
+# note that my pdftotext.exe is in a different location to yours
+lapply(SAA_files, function(i) system(paste('"C:/Program Files/xpdf/bin64/pdftotext.exe"', paste0('"', i, '"')), wait = FALSE) )
+
+# split each year into individual abstracts and name with year
+SAA_text_files <- list.files(path = dest, pattern = "txt",  full.names = TRUE)
+SAA_abstracts <- vector("list", length(SAA_text_files))
+
+for(i in seq_along(SAA_text_files)){
+  # combine the year into one giant vector
+  tmp <- paste0(readLines(SAA_text_files[[i]]), collapse = " ")
+  # spit that one vector at [number]
+  SAA_abstracts[[i]] <- unlist(strsplit(tmp, "\\[(.*?)\\]"))
+  # get the year of the conference from the filename
+  year <- as.numeric(gsub("[^0-9]", "", basename(SAA_text_files[[i]])))
+  # label each abstract with the year so we can plot with it
+  names(SAA_abstracts[[i]]) <- rep(year, length(SAA_abstracts[[i]]))
+}
+
+# convert list of chr vectors to data frame (rather slow)
+SAA_abstracts <- unlist(SAA_abstracts)
+
+
+# remove items with less than 100 words
+idx <- unlist(lapply(SAA_abstracts, function(i) length(unlist(strsplit(i, " "))) >= 100))
+SAA_abstracts_100 <-  SAA_abstracts[idx]
+rm(SAA_abstracts)
+
+
+# read text files into R
+SAA_corpus <- Corpus(VectorSource(SAA_abstracts_100))
+
+# make term document matrix
+SAA_tdm <- TermDocumentMatrix(SAA_corpus, 
+                          control = list(removePunctuation = TRUE, 
+                                         stopwords = TRUE,
+                                         removePunctuation = TRUE,
+                                         removeNumbers = TRUE,
+                                         removeNumbers = TRUE,
+                                         stripWhitespace = TRUE,
+                                         tolower = TRUE))
+# how many words? Make it pretty!
+# https://stat.ethz.ch/pipermail/r-help/2011-May/277544.html
+tmp <- vector("list", length(SAA_tdm$dimnames$Docs))
+for(i in seq_along(SAA_tdm$dimnames$Docs)){
+  tmp[[i]] <- sum(colSums(as.matrix(SAA_tdm[,i,])))
+  print(i)
+}
+SAA_word_count <- sum(unlist(tmp))
+SAA_word_count_pretty <- formatC(SAA_word_count, 
+                          big.mark=",",format="f", 
+                          drop0trailing = TRUE)
+# how many abstracts?
+count_of_SAA_abstracts_100 <- length(SAA_abstracts_100)
+count_of_SAA_abstracts_100_pretty <- formatC(count_of_SAA_abstracts_100, 
+                          big.mark=",",format="f", 
+                          drop0trailing = TRUE)
+
+# overall frequency of words in this dataset
+SAA_video_freq <- sum(colSums(as.matrix(SAA_tdm[SAA_tdm$dimnames$Terms == "video",])))
+SAA_video_freq_per_thou <- SAA_video_freq / SAA_word_count * 1000
+
+# association of video and other relevant words
+# get all words associated...
+SAA_associated_words <- findAssocs(SAA_tdm, "video", 0.01)
+# make data frame
+SAA_associated_words <- data.frame(word = dimnames(SAA_associated_words)[[1]],
+                                   corr = unname(SAA_associated_words)) 
+# find top correlated words
+SAA_top_corr <- SAA_associated_words %>%
+   arrange(desc(corr)) %>%
+   head(n = 50L)
+  
+# subset to find corrs with words of interest                      
+# toMatch is defined above for the DOA analysis  
+SAA_associated_words_df <- SAA_associated_words %>%
+  filter(grepl(paste(toMatch,collapse="|"), word)) %>%
+  arrange(desc(corr))
+
+# keyword in context
+
+kwic_corpus <- corpus(unname(SAA_abstracts_100))
+mykwic_video <- kwic(kwic_corpus, "video", 6)
+mykwic_blog <- kwic(kwic_corpus, "blog", 6)
+
+# read in again, just by per year this time, not each individual abstract
+SAA_corpus_by_year <- Corpus(DirSource(dest, pattern = "txt"))
+
+# make term document matrix
+SAA_tdm_by_year <- TermDocumentMatrix(SAA_corpus_by_year, 
+                          control = list(removePunctuation = TRUE, 
+                                         stopwords = TRUE,
+                                         removePunctuation = TRUE,
+                                         removeNumbers = TRUE,
+                                         removeNumbers = TRUE,
+                                         stripWhitespace = TRUE,
+                                         tolower = TRUE))
+
+# change in freq over time
+SAA_video_freq_over_time <- as.matrix(SAA_tdm_by_year[SAA_tdm_by_year$dimnames$Terms == "video",]) / colSums(as.matrix(SAA_tdm_by_year)) * 1000
+SAA_blog_freq_over_time <- as.matrix(SAA_tdm_by_year[SAA_tdm_by_year$dimnames$Terms == "blog",]) / colSums(as.matrix(SAA_tdm_by_year)) * 1000
+# make into data frame for plotting
+SAA_freq_over_time <- data.frame(SAA_video_freq = as.numeric(SAA_video_freq_over_time),
+                             SAA_blog_freq = as.numeric(SAA_blog_freq_over_time),
+                             theyear = as.numeric(gsub("[^0-9]", "", 
+                                  dimnames(SAA_video_freq_over_time)$Docs, perl = TRUE)))
+
+```
+
+```{r five_journals}
+##################### Five scholarly journals  ########################
+load("vlog_review_data/five_journals/unpack_multi.RData")
+
+# how many articles?
+
+# how many words? Make it pretty!
+# https://stat.ethz.ch/pipermail/r-help/2011-May/277544.html
+FIV_word_count <- sum(colSums(as.matrix(unpack_multi$wordcounts)))
+invisible(gc())
+number_of_articles <- length(unique(unpack_multi$bibliodata$doi))
+  
+FIV_word_count_pretty <- formatC(FIV_word_count, 
+                          big.mark=",",format="f", 
+                          drop0trailing = TRUE)
+# overall frequency of words in this dataset
+FIV_video_freq <- colSums(as.matrix(unpack_multi$wordcounts[,c("video")]))
+FIV_video_freq_per_thou <- unname(FIV_video_freq / FIV_word_count * 1000)
+
+# association of video and other relevant words
+# get all words associated...
+FIV_associated_words <- findAssocs(unpack_multi$wordcounts, "video", 0.01)
+# make data frame
+FIV_associated_words <- data.frame(word = dimnames(FIV_associated_words)[[1]],
+                                   corr = unname(FIV_associated_words)) 
+# find top correlated words
+FIV_top_corr <- FIV_associated_words %>%
+   arrange(desc(corr)) %>%
+   head(n = 50L)
+  
+# subset to find corrs with words of interest                      
+# toMatch is defined above for the DOA analysis  
+FIV_associated_words_df <- FIV_associated_words %>%
+  filter(grepl(paste(toMatch,collapse="|"), word)) %>%
+  arrange(desc(corr))
+```
+
+```{r video_freq_in_three_corpora, anchor="figure", fig.cap="Relative frequencies of 'video' in the three corpora", fig.align='center'}
+# plot relative freqs of 'video' in the three corpora
+
+freqs <- data.frame(blog = DOA_video_freq_per_thou,
+           abstracts = SAA_video_freq_per_thou,
+           articles = FIV_video_freq_per_thou)
+freqs_l <- melt(freqs)
+
+# force a small number of digits of decimal places
+
+fmt <- function(){
+    f <- function(x) format(round(x, 3), nsmall=3)
+    f
+}
+
+# draw plot
+ggplot(freqs_l, aes(variable, value)) +
+  geom_point(stat="identity", size = 5) +
+  scale_y_continuous(labels = fmt(), trans="log2") + 
+  xlab("Corpora") +
+  ylab("Frequency per thousand words")
+
+```
+
+```{r table_of_corr_words, anchor="table", tab.cap="Words highly correlated with 'video' in the three corpora", tab.align='center'}
+kable(cbind(blog = DOA_top_corr, 
+      abstracts = SAA_top_corr, 
+      articles = FIV_top_corr)[1:20,])
+```
+
+```{r}
+selected_associated_words <- cbind(DOA_associated_words_df[1:20,], 
+      SAA_associated_words_df[1:20,], 
+      FIV_associated_words_df[1:20,])
+
+```
+
+```{r}
+# cluster analysis of articles. 
+# subset to get only articles that have the word 'video'
+
+nouns <- JSTOR_dtmofnouns(unpack_multi, word = "video", sparse = 1, POStag = TRUE)
+# do cluster analysis 
+video_cluster <- JSTOR_clusterbywords(nouns, "video", f = 0.01)
+video_cluster
+```
+
+```{r saa_freq_over_time, anchor="figure", fig.cap="Frequency of the word 'video' over time in SAA abstracts", fig.align='center'}
+# plot frequency over time 
+
+names(SAA_freq_over_time) <- c("video", "blog", "theyear")
+freq_over_time_l <- melt(SAA_freq_over_time, id.vars = 'theyear')
+ggplot(freq_over_time_l, aes(theyear, value)) +
+  geom_bar(stat="identity",  position = "dodge", aes(fill = variable)) +
+  scale_x_continuous(breaks = SAA_freq_over_time$theyear) +
+  scale_fill_discrete(name = "word") +
+  theme_minimal() +
+  xlab("") +
+  ylab("Frequency per thousand words") 
+```
+
+```{r fiv_freq_over_time, anchor="figure", fig.cap="Frequency of the word 'video' over time in journal articles", fig.align='center'}
+# plot freq over time
+JSTOR_1word(unpack_multi, "video", span = 0.8, se = FALSE)
+```
+
+```{r fiv_cor_over_time, anchor="figure", fig.cap="Correlations of the word 'video' over time in journal articles", fig.align='center'}
+
+plot1 <- JSTOR_2wordcor(unpack_multi, "video", "film", span = 0.4) 
+plot2 <- JSTOR_2wordcor(unpack_multi, "video", "community", span = 0.4)
+grid.arrange(plot1, plot2, ncol=2)
+```
+
+To situate the Project Eliseg video project in context of past uses of video by archaeologists I have examined three different venues where archaeologists discuss their work. The three venues include the blog posts on the Day of Archaeology blog from 2012 and 2013 (`r DOA_doc_count` blog posts, `r DOA_word_count_pretty` words), abstracts of the last ten years of meetings of the Society of American Archaeology (`r count_of_SAA_abstracts_100_pretty` abstracts, `r SAA_word_count` words), and the full text of five scholarly archaeology journals hosted on JSTOR (`r number_of_articles` articles, `r FIV_word_count_pretty` words). These three datasets represent a much wider range of archaeologists and their work than a traditional literature review and allow insights into archaeological activity that is infrequently represented in the scholarly literature. The R code and data to reproduce the results presented here are openly available online here DOI. A full exploration of these corpora is beyond the scope of this review, however the open availability of the code and data allow anyone to explore further without any restrictions.  
+
+These three corpora are located along a spectrum from informal, public-facing writings on the day of archaeology blog, to ephemeral but more professionally-focused writing in the conference abstracts, to the enduring scholarly literature written for a specialist audience. In `r figr('video_freq_in_three_corpora', TRUE, type="figure")` we see that the relative frequency of the word 'video' is substantially higher in the blog posts compared to conference abstracts and journal articles. Looking at words that are strongly correlated with 'video', in `r figr('table_of_corr_words', TRUE, type="table")` we see that the blog posts are mostly concerned with practical details of field activites while the abstracts are mostly about professional film and television productions. The highly correlated words in the journal articles are difficult to interpret, probably because most of them are garbled from imperfect optical character recognition of PDF files. To workaround this, a k-means clustering method on the journal articles containing the word 'video' revealed four clusters of 38 articles. Two of the clusters contain articles about the use of video as an imaging and data collection. The topic of the third cluster is unlcear, and the fourth cluster, with only four articles, relates to community heritage management topics. The general impression here is that discussions of video by archaeologists most frequently occur in informal, public-facing writing such as the Day of Archaeology blog, and when they occur in that corpus they are often about fieldwork. At the other end of the spectrum, in the scholarly literature video is mostly discussed as a data collection method, and rarely as a mode of public outreach. These data indicate that the scholarly report on the Project Eliseg video project is unusual and a unique contribution to the professional archaeological literature. 
+
+We can get a chronological perspective on discussions of video from the SAA abstracts and the journal articles. In `r figr('saa_freq_over_time', TRUE, type="figure")` we see that video has been mentioned since 2004, the earliest that PDF files of abstracts are available, and peak in 2009 when there was a session titled 'It must be true, I saw it in a video' which aimed to  examine popular online video and television series to discover and evaluate messages about archaeology that they transmit to the public. By comparison, blogging only appears in the abstracts for the first time in 2010. In 2014 video was discussed as a tool for data collection during fieldwork, as a technology for archiving field data, and as a method for communication, both to the public via websites and to the professional audience via videos shown during the conference presentations. Amongst the scholarly articles we see the first mentions of video in the early 1960s, with a slight upward trend towards the present (`r figr('fiv_freq_over_time', TRUE, type="figure")`). In `r figr('fiv_cor_over_time', TRUE, type="figure")` we get an impression of how scholarly discussion of video has changed through time, as the correlation with 'film' decreases while the correlation with 'community' increases over time. This suggests that dicussions such as Tong et al. about the use of film to engage with the wider community may be becoming increasingly relevant and valued in scholarly publication. 
+
+### The aims, the structure and content of the videos
+
+The thirty videos created by or for Project Eliseg represent an excellent effort to go beyond the common methods of public engagement and create an enduring, engaging and visceral record of the field work. The videos complement a diverse outreach plaform that includes site visits by school groups, musuem displays and talks, media articles, longform blog posts and microblogging via Twitter. Such a comprehensive outreach strategy is remarkable and an excellent model for projects of any scale. The substantive archaeological goal of the fieldwork is to investigate the life-history of a medieval stone monument located on a mound in Denbighshire, Wales. The excavations were focused on identifing activity at three specific periods: testing for possible prehistoric origins of the monument, identifying early medieval reuse of the monument in mortuary and commemorative contexts, and identifying traces antiquarian excavations. The excavation was filmed for two specific reasons. First, to communicate the details of the fieldwork to people who are unable to travel to the location and visit the excavation in person, and second, to capture the field workers' initial and changing interpretations of the archaeological evidence during the moments they encounter it. It is not clear at what point the value of the second aim is extracted - is the value generated by focusing one's thoughts to speak coherently to a camera, or is the value generated by reviewing the field work video during the post-exacation analysis phase?   Presumably both are implied, but there is no clear stratety for how the vidoes will be used as an interpretative aid beyond the moment of their creation. Tong et al. note that 'Perhaps the greatest benefit was to summarise the end of each field season', suggesting that the process of self-reflection leading up to speaking to the camera was especially valued. This also raises of the question of whether the post-excavation analyses activities will be recorded by video logs, which is not addressed by Tong et al.
+
+The twin purposes of creating the videos indicate two distinct intended audiences: an audience of interested members of the public with little or no specialised knowledge of archaeology, and an audience of archaeologists, perhaps even the same archaeologists who are conducting the excavations. Most of the videos are clearly directed at the public audience, but the videos sometimes switch between these two audiences uneasily. One one hand, there is some engaging and entertaining general details about the field work from Tong that is well-suited for public consumption in the Season 3: Day Five video. Similarly, in the Season 3: Day Nine there is a well-constructed commentary by Kirton on the recording of a cist. This video is confidently narrated and leads the non-expert viewer at a comfortable pace, clealy illustrating the technique of quarter-sectioning and describing the finds of cremated bone and the context of these finds. In the Season 3: Day Eleven and Twelve videos, Robinson similarly gives an accessbile description of cist excavation, taking care to define technical terms, with his narration elegantly accompanied by illustrative still images and video. 
+
+On the other hand, in the Season 3: Day Fourteen video there is a regrettably short dismissal of the interporetation of a bone pin as a high status object by Williams. Williams presumes that his viewers may have been mislead by unnamed popular television programs to understand the bone pin as a status symbol, an interpretation he rejects without explanation. While this might be a valuable record of the interprative process for later review by the team, the viewer amongst the general public is left wondering what the preferred alternative explanation actually is, and an opportunity for a positive and constructive engagement with public understanding of archaeology seems to have been missed. Williams' screen presence is complex, his narrations of the field work are the most substantial and lengthy, and his delivery is highly animated, enaging and well-suited for public consumption. One source of this complexity is his use of humour, which is occasionaly problematic because although Tong et al. indicate this was intended as a gently mocking reference to popular television programs about archaeology, it may be mistaken for professorial condescension, especially by viewers who are not familiar with popular depictions of archaeological fieldwork on British television. The challenges and risks of using humor in public speaking are well-documented, and self-effacing humour is regarded as the safest strategy because it creates conversational rapport, makes the speaker seem more approachable, and has no implied superiority of the speaker over the audience (Attardo 2014). 
+
+One of the challenges in fulfilling these dual purposes of makes the videos is the rapid pace of production. A distinctive characteristics of vlogging, compared to other forms of video capture and production such as documentary making, is that videos are recorded, produced and released on a regular and short schedule. In this case nearly all the videos were captured, edited and uploaded to youtube within a day. This represents a substantial investment of time, and a remarkable accomplishmnt, for the project videographer, a undergratuate archaeology student who was also working on the project as an archaeologist. This rapid productive gives a feeling of real-time reporting and is an impressive fulfiment of the goals of shortening the distance between the excavation location and anyone who wants to learn more about the fieldwork. A wide variety of cinematic techniques are employed in the videos, including subtitles, overlays and annotations, pans, zooms, and varied scene composition and transitions. The effective use of these techniques adds visual interest and appeal to the videos and keeps the viewer engaged. The quality of sound recording is impressive given the basic equipment used and the challenging conditions of high winds and road noise. A universal limitation of any video is the difficulty of searching for content within a clip. In this case a brief description of each video helps to orient the viewer, but the notes are very brief, and the automatically generated captions on youtube are comically inaccurate, so the contents of the videos are effectively unsearchable. This could be overcome by a more detailed description for each video, which was presumably prevented by time constraints. The structure of the videos varies, with most videos opening with a short introduction, but some do not, and most lacking a satisfying conclusion. Given the rapid production schedule, these structural inconsistencies are understandable, but it is worth noting that effective video is like effective writing, in that it has an obvious structure, audience and purpose. A recurring video structure of a clear introduction, main body (perhaps including something like 'artefact of the day') and clear conclusion would have given more unity to the video collection, and helped generate engagement and recurring veiwers. 
+
+```{r}
+### scrape basic video analytics from Project Eliseg vlogs
+videos <- html("https://www.youtube.com/user/ProjectElisegMedia/videos")
+
+# identify elements on the page that have data we want
+# view count and video duration 
+views_node <- ".yt-lockup-meta-info li:nth-child(1)"
+time_node <- ".yt-lockup-thumbnail"
+
+# extract view counts
+views <- videos %>% 
+  html_nodes(views_node) %>%
+  html_text() %>%
+  gsub("[^\\d]+", "", ., perl=TRUE) %>%
+  as.numeric()
+
+# extract durations
+duration <- videos %>% 
+  html_nodes(time_node) %>%
+  html_text() %>%
+  gsub("[[:alpha:]]+", "", .) %>%
+  gsub("\n", "", .) %>%
+  gsub("\\s","", .)
+
+# convert to seconds
+secs <-  as.numeric(gsub(":.*", "", duration)) * 60 +
+  as.numeric(gsub(".*:", "", duration))
+
+# combine counts and durations
+video_data <- data.frame(views = views, 
+                         duration = secs)
+video_data_l <- melt(video_data)
+```
+
+
+Tong et al. offer a balanced assessment of the reach and engagement that the videos acheived, noting the mixed reactions recorded during ethnographic interviews with local residents to the videos, and the low level of engagement (comments, likes and shares) on the videos on the youtube website. At the time of writing there were a total of 8,708 views of the entire video collection, but interpreting this value is difficult because there is no way to tell the difference between one person watching a video 100 times or a hundred people are watching the first five seconds of the same single video. In any case, the median view count of `r round(median(views),0)` supports the claim of Tong et al that the videos were a 'a moderate success' in reaching an audience in a different way to an in in-person site visit (there is no information about whether site visitors were not also viewers of the videos). Tong et al. note the wide distribution of view counts on youtube, with the 35 minute 'Season Two, Pillar of Eliseg Archaeological Excavation' end-of-season video being viewed ten times more than most of the daily videos that are less than five minutes long. While the video analytics have limited interpretative potential and suggest relatively low engagement, there is an interesting relationship between view count and video duration. In  `r figr('views-duration', TRUE, type="figure")` we see a positive correlation between view count and video duration, but only up to videos around 250 seconds long (roughly four minutes). For videos longer than four minutes, the relationship disappears, suggesting that this might be the optimum duration for a daily video log of an activity like excavation. These data are consistent with previous findings (Biel et al 2011a,b) that four minutes is an ideal time for video blogs.
+
+```{r views-duration, anchor="figure", fig.cap="Relationship of video views to video duration"}
+## explore with a plot
+
+video_data %>%
+  ggplot(aes(x = views, y = duration)) +
+  geom_smooth(subset = .(views < 1000)) + 
+  geom_point(size = 3, subset = .(views < 1000)) +
+  xlab(" Number of views") +
+  ylab("Video duraction (seconds)") +
+  theme_minimal()
+
+```
+
+### A model of public engagement
+
+Implicit in any strategy of public engagement is a model of how the public understand archaeology, and to explore the use of video by Project Eliseg I turn to a tripartite model of archaeological understanding based on Abbott’s (2004) updating of Charles Morris’ (1946) classic theory of semiotic relations (Marwick et al. 2013). The three componenets are syntactic archaeology, semantic archaeology and pragmatic archaeology. Syntactic archaeology refers to the presentation of archaeology as a set of abstract arguments about prehistoric human life with little tractable value to the public, perhaps uncharitably desccribed by the public as an ivory tower game. Semantic archaeology is a more positive understanding of archaeology as a transposing activity where a question about the past is moved into the common-sense world of the immediate where it becomes immediately comprehensible. Pragmatic archaeology is archaeology that results in intervention on a current issue of public importance. Because archaeological research rarely encounters a narrow neck of causality (Abbott 2004:9), the public rarely understand archaeology as a pragmatic activity. 
+
+The Project Eliseg videos convey to the public the understanding of syntactic and semantic archaeology. The focus on excavation technique in many of the videos establishes the team as diligent and careful, but represents syntactic archaeology because of the prominence of technical details of the archaeological process. On the other hand, the focus on the cysts at the site and the dicsussion of funerary behaviours and antiquarian excavations in many of the videos conveys a semantic understanding of archaeology. The prehistoric treatment of the dead, and the antiquarian fascination with this are themes prominent in Williams' contributions to the videos, and help to transpose the details of the archaeological record to tractable issues about how the dead were treated and the social meaning of the monumnet. Tong et al note that the videos discussing the mortuary contexts were amongst the most viewed, demonstrating the intensity of public engagement with semantic archaeological understanding. A pragmatic understanding of archaeology did not appear to be succesfully conveyed, with Tong et al. describing apparent indifference from local residents towards the excavation. 
+
+
+
+
+
+
+
+
+## References
+
+Abbott, A.D. 2004. Methods of discovery: Heuristics for the social sciences. WW Norton and Co., New York.
+
+Attardo, S. (Ed.). (2014). Encyclopedia of Humor Studies. SAGE Publications.
+Chicago  
+
+Biel, J. I., & Gatica-Perez, D. (2011). Vlogsense: Conversational behavior and social attention in youtube. ACM Transactions on Multimedia Computing, Communications, and Applications (TOMCCAP), 7(1), 33.
+
+Biel, J. I., Aran, O., & Gatica-Perez, D. (2011, May). You Are Known by How You Vlog: Personality Impressions and Nonverbal Behavior in YouTube. In ICWSM.
+
+Marwick, B., R. Shoocongdej, C. Thongcharoenchaikit, B. Chaisuwan, C. Khowkhiew and S. Kwak 2013. Hierarchies of engagement and understanding: Community engagement during archaeological excavations at Khao Toh Chong rockshelter, Krabi, Thailand. In S. O'Connor (ed) Transcending the Culture-Nature Divide in Cultural Heritage. Terra Australis, ANU E Press.
+
+Morris, C. 1946. Signs, language and behavior. Prentice-Hall, Oxford.
+
+lab work?
+
+Excellent effort to ensure multi-media outreach and communication of activities
+Challenge of target audience - by not having on the videos didn’t reach any audience, mix of public (emphasis on care and detail, reassurance to locals that work was diligent and with integrity) and professional (technical vocabulary: context, feature, cut, etc.)
+Most views are on long pro video that sums it up, videos lack common structure, like introduction and conclusion, speakers not introduced, only day one has any names
+Some nice overlays and annotations, voiceovers on photos and pans, nice edits, nice views and scenes, good eye for composition, subtitles 
+Day three 2011: the purpose is to reach people who cannot visit in person… capture interpretations of archaeologists… process of excavation… 
+Season three Day five, Joseph Tong is very charismatic narrator, clearly addressing the interested person in the region, who might be motivated by the videos to visit the site. 
+Self-censorship - not showing human remains
+Video is like writing, has structure, has audience, has purpose, it does not speak for itself. The audience determines many of the technical details of the video: amount and type of dialog, shot types (people, action, object/area pans) 
+how my syntactic-semantic-pragmatic framework could help
+text analysis of dayofarchaeology blog and SAA abstracts to see how ‘video’ is being used. 
+
+Scholarly literature on vlogging:
+
+http://kelder.zeus.ugent.be/~ide/open_dir/Oude%20bestanden/3de_Bach/Sem_2/Itech/Artikels/VideoBlogging.pdf
+http://sro.sussex.ac.uk/2245/1/Harley_and_Fitzpatrick_Dist.pdf
+http://159.226.42.3/doc/2010/ACMCS-Vlogging%20A%20Survey%20of%20Video%20Blogging%20Technology%20on%20the%20Web.pdf
+file:///C:/Users/marwick/Downloads/1498-7861-1-PB.pdf
+
+
+
+
+
