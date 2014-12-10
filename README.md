@@ -1,4 +1,4 @@
-## Supplementary materials for an Open Review for _Internet Archaeology_
+## Supplementary Materials for an Open Review for _Internet Archaeology_
 
 ### Compendium DOI: 
  
@@ -8,14 +8,13 @@ Ben Marwick (benmarwick@gmail.com)
 
 ### Published in: 
 
-
 ## Use
 
 The simplest way to access the code and data is to download and unzip the repository from here:
 
 https://github.com/benmarwick/vlog_to_death_review/archive/master.zip  
 
-Then open and run the rmd file in RStudio.
+Then open and run the rmd file in [RStudio](http://www.rstudio.com/products/rstudio/).
 
 ### Contents:
 
@@ -23,11 +22,13 @@ This repository contains code and data used to accompany my open review of Tong 
 
 The `vlog_review.rmd` file includes the R code and narrative text of my review.
 
-In the /vlog_review_data directory: 
+In the `/vlog_review_data` directory: 
 
-/DOA_posts contains a CSV file of text posted during 2013-2013 on the [Day of Archaeology](http://www.dayofarchaeology.com/) 
+`/DOA_posts` contains a CSV file of text posted during 2013-2013 on the [Day of Archaeology](http://www.dayofarchaeology.com/) 
 
-/SAA_abstracts contains PDF and text files of abstracts of the [Society of American Archaeology](http://www.saa.org/) annual meetings during 2004-2014
+`/SAA_abstracts` contains PDF and text files of abstracts of the [Society of American Archaeology](http://www.saa.org/) annual meetings during 2004-2014
+
+The data from JSTOR are not included here as it's not clear if the [JSTOR DFR](http://dfr.jstor.org/) terms and conditions permit re-sharing of their data. 
 
 ### Licenses:
 
@@ -39,7 +40,7 @@ Data: CC0 http://creativecommons.org/publicdomain/zero/1.0/ attribution requeste
 
 ### Dependencies:
 
-I used [RStudio](http://www.rstudio.com/products/rstudio/) (0.99.56) on Windows 7. Here is the sessionInfo()
+I used [RStudio](http://www.rstudio.com/products/rstudio/) (0.99.56) on Windows 7. Here is a summary of the computational environment (from `sessionInfo()`):
 
 ```
 R version 3.1.1 (2014-07-10)
