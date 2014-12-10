@@ -1,6 +1,8 @@
 ## Supplementary Materials for an Open Review for _Internet Archaeology_
 
 ### Compendium DOI: 
+
+[![DOI](https://zenodo.org/badge/doi/10.5281/zenodo.13187.svg)](http://dx.doi.org/10.5281/zenodo.13187)
  
 ### Author of this repository:
 
