@@ -1,9 +1,11 @@
 ---
 title: ''
 output:
-  word_document: default
   html_document:
-    self_contained: no
+    self_contained: yes
+  pdf_document:
+    latex_engine: xelatex
+  word_document: default
 ---
 
 
