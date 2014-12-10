@@ -1,0 +1,8 @@
+.Rproj.user
+.Rhistory
+.RData
+*.doc
+*.docx
+*.pdf
+vlog_review_cache
+
