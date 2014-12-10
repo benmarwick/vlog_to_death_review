@@ -1,11 +1,11 @@
 ---
 title: ''
 output:
-  word_document: default
   pdf_document:
     latex_engine: xelatex
   html_document:
     self_contained: yes
+  word_document: default
 ---
 
 ```{r number_figures, echo=FALSE, message=FALSE, warning=FALSE}
@@ -68,7 +68,7 @@ library(quanteda)
 library(JSTORr)
 library(gridExtra)
 library(kfigr) # devtools::install_github("mkoohafkan/kfigr")
-opts_chunk$set(message=FALSE, warning=FALSE, echo=FALSE, cache=TRUE, fig.width=6)
+opts_chunk$set(message=FALSE, warning=FALSE, echo=FALSE, cache=TRUE)
 ```
  
 ## Video Blogging in Archaeology: A review of Tong et al.'s Project Eliseg videos
