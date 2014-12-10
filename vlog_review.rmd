@@ -1,11 +1,11 @@
 ---
 title: ''
 output:
-  word_document: default
-  pdf_document:
-    latex_engine: xelatex
   html_document:
     self_contained: yes
+  pdf_document:
+    latex_engine: xelatex
+  word_document: default
 ---
 
 ```{r number_figures, echo=FALSE, message=FALSE, warning=FALSE}

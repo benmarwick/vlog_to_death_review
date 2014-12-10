@@ -16,7 +16,7 @@ The simplest way to access the code and data is to download and unzip the reposi
 
 https://github.com/benmarwick/vlog_to_death_review/archive/master.zip  
 
-Then open and run the rmd file in [RStudio](http://www.rstudio.com/products/rstudio/).
+First, ensure that you have all the dependencies installed (see below for details) to recreate my computational environment. Then open and run the rmd file in [RStudio](http://www.rstudio.com/products/rstudio/).
 
 ### Contents:
 

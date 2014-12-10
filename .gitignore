@@ -3,7 +3,6 @@
 .RData
 *.doc
 *.docx
-*.pdf
 vlog_review_cache
 vlog_review_data/five_journals/unpack_multi.RData
 
