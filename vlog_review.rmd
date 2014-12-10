@@ -68,10 +68,12 @@ library(quanteda)
 library(JSTORr)
 library(gridExtra)
 library(kfigr) # devtools::install_github("mkoohafkan/kfigr")
-opts_chunk$set(message=FALSE, warning=FALSE, echo=FALSE, cache=TRUE)
+opts_chunk$set(message=FALSE, warning=FALSE, echo=FALSE, cache=TRUE, fig.width=6)
 ```
  
 ## Video Blogging in Archaeology: A review of Tong et al.'s Project Eliseg videos
+
+Ben Marwick
 
 In this review I evaluate the report by Tong et al. on the use of video of archaeological fieldwork during the Project Eliseg excavations. To understand the context of the Tong et al. study, I briefly survey how video is discussed by archaeologists in blog posts, conference presentations and scholarly articles. I then assess the aims, structure, content and technique of the videos produced by Project Eliseg. Finally, I analyse the strengths and weaknesses of their use of video using a model of public engagement.
 
