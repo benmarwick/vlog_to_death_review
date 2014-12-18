@@ -1,11 +1,11 @@
 ---
 title: ''
 output:
-  html_document:
-    self_contained: yes
+  word_document: default
   pdf_document:
     latex_engine: xelatex
-  word_document: default
+  html_document:
+    self_contained: yes
 ---
 
 ```{r number_figures, echo=FALSE, message=FALSE, warning=FALSE}
@@ -71,9 +71,9 @@ library(kfigr) # devtools::install_github("mkoohafkan/kfigr")
 opts_chunk$set(message=FALSE, warning=FALSE, echo=FALSE, cache=TRUE, fig.width=7)
 ```
  
-## Video Blogging in Archaeology: A review of Tong et al.'s Project Eliseg videos
+## Films, digs and death: A review of Tong et al.'s Project Eliseg videos
 
-Ben Marwick
+Ben Marwick (ORCID: http://orcid.org/0000-0001-7879-4531)
 
 In this review I evaluate the report by Tong et al. on the use of video of archaeological fieldwork during the Project Eliseg excavations. To understand the context of the Tong et al. study, I briefly survey how video is discussed by archaeologists in blog posts, conference presentations and scholarly articles. I then assess the aims, structure, content and technique of the videos produced by Project Eliseg. Finally, I analyse the strengths and weaknesses of their use of video using a model of public engagement.
 
@@ -311,8 +311,13 @@ fmt <- function(){
 video_freq_in_three_corpora <- ggplot(freqs_l, aes(variable, value)) +
   geom_point(stat="identity", size = 5) +
   scale_y_continuous(labels = fmt(), trans="log2") + 
-  xlab("Corpora") +
-  ylab("Frequency per thousand words")
+  xlab("") +
+  ylab("Frequency per 1000 words") +
+  theme_minimal() +   
+  theme(text = element_text(size=20)) 
+  
+ggsave("figures/video_freq_in_three_corpora.png", 
+       width = 16, height = 10, units = "cm", dpi = 1200)
 
 ```
 
@@ -344,7 +349,13 @@ saa_freq_over_time <- ggplot(freq_over_time_l, aes(theyear, value)) +
   scale_fill_discrete(name = "word") +
   theme_minimal() +
   xlab("") +
-  ylab("Frequency per thousand words") 
+  ylab("Frequency per \n1000 words") +
+  theme_minimal() +   
+  theme(text = element_text(size=20),
+        axis.text.x = element_text(angle=90, vjust=0.4)) 
+
+ggsave("figures/saa_freq_over_time.png",
+       width = 16, height = 10, units = "cm", dpi = 2000)
 ```
 
 To situate the Project Eliseg video project in context of past uses of video by archaeologists, I used distant reading methods (Jockers 2013, 2014; Moretti 2013) to examine three different venues where archaeologists discuss their work. The three venues include blog posts on the Day of Archaeology blog (http://www.dayofarchaeology.com/) from 2012 and 2013 (`r DOA_doc_count` blog posts, `r DOA_word_count_pretty` words), abstracts of the last ten years of meetings of the Society of American Archaeology (obtained from http://www.saa.org/, `r count_of_SAA_abstracts_100_pretty` abstracts, `r SAA_word_count_pretty` words), and the full text of five scholarly archaeology journals hosted on JSTOR (World Archaeology, American Antiquity, Journal of Archaeological Research, Journal of World Prehistory, Journal of Field Archaeology, obtained from http://dfr.jstor.org/, `r number_of_articles` articles, `r FIV_word_count_pretty` words). These three datasets represent a much wider range of archaeologists and their work than a traditional literature review and allow insights into archaeological activities that are infrequently represented in the scholarly literature. The R code and data to reproduce the results presented here are openly available online here http://dx.doi.org/10.5281/zenodo.13187. Since a full exploration of this rich dataset is beyond the scope of this review, the open availability of the code and data allows anyone to explore further without any restrictions.  
@@ -465,15 +476,34 @@ saa_freq_over_time
 
 ```{r fiv_freq_over_time, anchor="figure", fig.cap="Frequency of the word 'video' over time in journal articles"}
 # plot freq over time
-JSTOR_1word(unpack_multi, "video", span = 0.8, se = FALSE)
+JSTOR_1word(unpack_multi, "video", span = 0.8, se = FALSE) +
+  theme_minimal() +
+  theme(text = element_text(size=10),
+        axis.text.x = element_text(angle=90, vjust=0.4))
+
+ggsave("figures/video_in_five_articles.png", 
+       width = 16, height = 10, units = "cm", dpi = 2000)
 ```
 
 ```{r fiv_cor_over_time_film, anchor="figure", fig.cap="Correlations of the word 'video' with 'film' over time in journal articles"}
-JSTOR_2wordcor(unpack_multi, "video", "community", span = 0.4)
+JSTOR_2wordcor(unpack_multi, "video", "film", span = 0.4) +
+  theme_minimal() +
+  theme(text = element_text(size=10),
+        axis.text.x = element_text(angle=90, vjust=0.4))
+
+ggsave("figures/video_film_corr_in_five_articles.png",
+       width = 16, height = 10, units = "cm", dpi = 2000)
 ```
 
 ```{r fiv_cor_over_time_community, anchor="figure", fig.cap="Correlations of the word 'video' with 'community' over time in journal articles"}
-JSTOR_2wordcor(unpack_multi, "video", "community", span = 0.4)
+JSTOR_2wordcor(unpack_multi, "video", "community", span = 0.4) +
+  theme_minimal() +
+  theme(text = element_text(size=10),
+        axis.text.x = element_text(angle=90, vjust=0.4)) +
+  ylab("correlation between 'video' \nand 'community'") 
+
+ggsave("figures/video_community_corr_in_five_articles.png",
+       width = 16, height = 10, units = "cm", dpi = 2000)
 ```
 
 ```{r views-duration, anchor="figure", fig.cap="Relationship of video views to video duration"}
@@ -484,8 +514,13 @@ video_data %>%
   geom_smooth(subset = .(views < 1000)) + 
   geom_point(size = 3, subset = .(views < 1000)) +
   xlab(" Number of views") +
-  ylab("Video duraction (seconds)") +
-  theme_minimal()
+  ylab("Video duration (seconds)") +
+  theme_minimal() +
+  theme(text = element_text(size=20)) +
+  theme(aspect.ratio = 1/1.618)
+
+ggsave("figures/video_data.png",
+       width = 16, height = 10, units = "cm", dpi = 2000)
 
 ```
 
